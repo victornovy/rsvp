@@ -1,0 +1,17 @@
+{
+  "name": "rsvp-monorepo",
+  "private": true,
+  "packageManager": "pnpm@11.17.0",
+  "scripts": {
+    "dev:app": "pnpm --filter @rsvp/app dev",
+    "dev:marketing": "pnpm --filter @rsvp/marketing dev",
+    "build:app": "pnpm --filter @rsvp/app build",
+    "build:marketing": "pnpm --filter @rsvp/marketing build",
+    "db:types": "supabase gen types typescript --local --schema public > packages/db/src/types.generated.ts",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4"
+  }
+}

@@ -1,0 +1,17 @@
+node_modules/
+.pnpm-store/
+.next/
+out/
+dist/
+build/
+.env
+.env.local
+.env.*.local
+.DS_Store
+*.log
+.turbo/
+supabase/.temp/
+*.tsbuildinfo
+next-env.d.ts
+.idea/
+.vscode/
