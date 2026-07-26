@@ -30,3 +30,12 @@ export const rsvpResponseSchema = z.object({
   name: z.string().trim().min(1).max(200).optional(),
   contact: z.string().trim().max(200).optional().nullable(),
 });
+
+export const validatorLinkCreateSchema = z.object({
+  label: z.string().trim().max(80).optional().nullable(),
+  expires_at: z.string().datetime({ offset: true }).optional().nullable(),
+});
+
+export const checkinSchema = z.object({
+  qr_token: z.string().trim().min(1, "QR inválido").max(64),
+});

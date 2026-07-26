@@ -24,8 +24,13 @@ export default async function EditEventPage({
 
   return (
     <>
-      <AppHeader title="Editar evento" />
-      <main className="mx-auto max-w-xl px-4 py-8">
+      <AppHeader
+        title="Editar evento"
+        backHref={`/events/${event.id}`}
+        backLabel="Voltar ao evento"
+      />
+      <main className="mx-auto max-w-xl px-4 py-8 sm:px-6">
+        <h1 className="mb-6 font-display text-2xl text-ink">Editar evento</h1>
         <EventForm mode="edit" event={event} />
       </main>
     </>

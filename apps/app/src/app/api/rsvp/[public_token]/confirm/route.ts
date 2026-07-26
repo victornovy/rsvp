@@ -1,6 +1,7 @@
 import { createSupabaseServiceClient, generateToken } from "@rsvp/db";
 import { apiError, apiOk } from "@/lib/api-response";
 import { rsvpConfirmSchema } from "@/lib/validation";
+import { ensureCredential } from "@/lib/credentials";
 
 export async function POST(
   request: Request,
@@ -10,7 +11,7 @@ export async function POST(
 
   const { data: event, error: eventError } = await supabase
     .from("events")
-    .select("id, max_people, status")
+    .select("id, max_people, status, anti_penetra")
     .eq("public_token", params.public_token)
     .maybeSingle();
 
@@ -91,6 +92,21 @@ export async function POST(
       return apiError("INTERNAL_ERROR", companionsError.message, 500);
     }
     companions = companionRows;
+  }
+
+  if (event.anti_penetra) {
+    const partyGuestIds = [mainGuest.id, ...companions.map((c) => (c as { id: string }).id)];
+
+    // A credencial é um bônus sobre a confirmação já registrada — se a
+    // emissão falhar, não desfazemos o RSVP. A credencial pode ser gerada
+    // sob demanda depois (ver página de credencial pública).
+    await Promise.all(
+      partyGuestIds.map((guestId) =>
+        ensureCredential(supabase, event.id, guestId).catch((err) => {
+          console.error("Falha ao emitir credencial:", err instanceof Error ? err.message : err);
+        }),
+      ),
+    );
   }
 
   return apiOk(

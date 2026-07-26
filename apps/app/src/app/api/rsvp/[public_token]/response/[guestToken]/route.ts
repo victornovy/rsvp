@@ -1,6 +1,7 @@
 import { createSupabaseServiceClient } from "@rsvp/db";
 import { apiError, apiOk } from "@/lib/api-response";
 import { rsvpResponseSchema } from "@/lib/validation";
+import { ensureCredential } from "@/lib/credentials";
 
 export async function PATCH(
   request: Request,
@@ -10,7 +11,7 @@ export async function PATCH(
 
   const { data: event, error: eventError } = await supabase
     .from("events")
-    .select("id, max_people, status")
+    .select("id, max_people, status, anti_penetra")
     .eq("public_token", params.public_token)
     .maybeSingle();
 
@@ -83,6 +84,12 @@ export async function PATCH(
 
   if (updateError) {
     return apiError("INTERNAL_ERROR", updateError.message, 500);
+  }
+
+  if (event.anti_penetra && updated.response === "yes") {
+    await ensureCredential(supabase, event.id, updated.id).catch((err) => {
+      console.error("Falha ao emitir credencial:", err instanceof Error ? err.message : err);
+    });
   }
 
   return apiOk({ guest: updated });

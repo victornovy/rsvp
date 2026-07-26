@@ -1,3 +1,63 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  ::selection {
+    background-color: theme("colors.guava.DEFAULT");
+    color: white;
+  }
+
+  :focus-visible {
+    outline: 2px solid theme("colors.guava.DEFAULT");
+    outline-offset: 2px;
+  }
+
+  html {
+    color-scheme: light;
+  }
+}
+
+@layer components {
+  /* Fraunces is loaded as a variable font; pin a default weight so
+   * headings render at the intended display weight without needing
+   * font-semibold on every usage. */
+  .font-display {
+    font-weight: 560;
+  }
+
+  /*
+   * Ticket-stub card: two semicircular notches punched into the left/right
+   * edges, like a torn admission ticket. The notch color must match the
+   * surface the card sits on (default: --paper). Pass a CSS variable
+   * --notch-bg on the element to punch through a different background.
+   */
+  .stub-card {
+    position: relative;
+    --notch-bg: theme("colors.paper");
+  }
+
+  .stub-card::before,
+  .stub-card::after {
+    content: "";
+    position: absolute;
+    top: var(--notch-top, 44px);
+    width: 20px;
+    height: 20px;
+    border-radius: 9999px;
+    background: var(--notch-bg);
+    z-index: 1;
+  }
+
+  .stub-card::before {
+    left: -10px;
+  }
+
+  .stub-card::after {
+    right: -10px;
+  }
+
+  .stub-divider {
+    border-top: 1.5px dashed theme("colors.line");
+  }
+}

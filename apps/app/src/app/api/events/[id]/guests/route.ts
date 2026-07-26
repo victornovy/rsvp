@@ -1,5 +1,9 @@
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { apiError, apiOk } from "@/lib/api-response";
+import { fetchGuestRows, type GuestFilters } from "@/lib/guest-rows";
+
+const RESPONSE_VALUES = ["yes", "no", "pending"] as const;
+const CREDENTIAL_VALUES = ["active", "used", "revoked"] as const;
 
 export async function GET(
   request: Request,
@@ -16,21 +20,22 @@ export async function GET(
 
   const { searchParams } = new URL(request.url);
   const search = searchParams.get("q")?.trim();
+  const responseParam = searchParams.get("response");
+  const credentialParam = searchParams.get("credential");
 
-  let query = supabase
-    .from("guests")
-    .select("*")
-    .eq("event_id", params.id)
-    .order("created_at", { ascending: true });
-
-  if (search) {
-    query = query.ilike("name", `%${search}%`);
+  const filters: GuestFilters = { search: search || undefined };
+  if (RESPONSE_VALUES.includes(responseParam as (typeof RESPONSE_VALUES)[number])) {
+    filters.response = responseParam as GuestFilters["response"];
+  }
+  if (CREDENTIAL_VALUES.includes(credentialParam as (typeof CREDENTIAL_VALUES)[number])) {
+    filters.credentialStatus = credentialParam as GuestFilters["credentialStatus"];
   }
 
-  const { data: guests, error } = await query;
-
-  if (error) {
-    return apiError("INTERNAL_ERROR", error.message, 500);
+  let guests;
+  try {
+    guests = await fetchGuestRows(supabase, params.id, filters);
+  } catch (err) {
+    return apiError("INTERNAL_ERROR", err instanceof Error ? err.message : "Erro inesperado.", 500);
   }
 
   const { data: allGuests, error: countsError } = await supabase

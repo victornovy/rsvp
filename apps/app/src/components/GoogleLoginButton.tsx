@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { GoogleIcon } from "@/components/icons";
 
 export function GoogleLoginButton() {
   const [loading, setLoading] = useState(false);
@@ -22,9 +23,10 @@ export function GoogleLoginButton() {
       type="button"
       onClick={handleLogin}
       disabled={loading}
-      className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:opacity-60"
+      className="inline-flex w-full items-center justify-center gap-3 rounded-full border border-line bg-white px-5 py-3 text-sm font-semibold text-ink shadow-sm transition hover:border-ink/30 hover:shadow-card disabled:opacity-60"
     >
-      {loading ? "Redirecionando..." : "Entrar com Google"}
+      <GoogleIcon />
+      {loading ? "Redirecionando…" : "Continuar com Google"}
     </button>
   );
 }

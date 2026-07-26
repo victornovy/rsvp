@@ -1,3 +1,16 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  ::selection {
+    background-color: theme("colors.guava.DEFAULT");
+    color: white;
+  }
+}
+
+@layer components {
+  .font-display {
+    font-weight: 560;
+  }
+}

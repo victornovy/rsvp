@@ -2,6 +2,11 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { AppHeader } from "@/components/AppHeader";
+import { Button } from "@/components/ui/Button";
+import { TicketCard, TicketDivider } from "@/components/ui/TicketCard";
+import { StatusBadge, eventStatusTone } from "@/components/ui/StatusBadge";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { PlusIcon, TicketIcon } from "@/components/icons";
 
 const STATUS_LABEL: Record<string, string> = {
   active: "Ativo",
@@ -9,11 +14,13 @@ const STATUS_LABEL: Record<string, string> = {
   archived: "Arquivado",
 };
 
-function formatDate(iso: string) {
-  return new Intl.DateTimeFormat("pt-BR", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(iso));
+function dateParts(iso: string) {
+  const date = new Date(iso);
+  return {
+    day: new Intl.DateTimeFormat("pt-BR", { day: "2-digit" }).format(date),
+    month: new Intl.DateTimeFormat("pt-BR", { month: "short" }).format(date).replace(".", ""),
+    time: new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(date),
+  };
 }
 
 export default async function DashboardPage() {
@@ -42,51 +49,81 @@ export default async function DashboardPage() {
     }
   }
 
+  const activeCount = (events ?? []).filter((e) => e.status === "active").length;
+
   return (
     <>
       <AppHeader title="Meus eventos" />
-      <main className="mx-auto max-w-3xl px-4 py-8">
-        <div className="mb-6 flex items-center justify-between">
-          <p className="text-sm text-gray-500">
-            {events?.length ?? 0} evento(s)
-          </p>
-          <Link
-            href="/events/new"
-            className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white"
-          >
+      <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
+        <div className="mb-7 flex items-end justify-between gap-4">
+          <div>
+            <h1 className="font-display text-2xl text-ink">Meus eventos</h1>
+            <p className="mt-1 text-sm text-ink-muted">
+              {activeCount} {activeCount === 1 ? "evento ativo" : "eventos ativos"}
+            </p>
+          </div>
+          <Button href="/events/new">
+            <PlusIcon width={16} height={16} />
             Novo evento
-          </Link>
+          </Button>
         </div>
 
         {!events || events.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-gray-300 p-10 text-center text-sm text-gray-500">
-            Você ainda não criou nenhum evento.
-          </div>
+          <EmptyState
+            icon={<TicketIcon width={28} height={28} />}
+            title="Nenhum evento ainda"
+            description="Crie seu primeiro evento para gerar o link de confirmação e começar a receber respostas."
+            action={
+              <Button href="/events/new" size="sm">
+                <PlusIcon width={16} height={16} />
+                Criar evento
+              </Button>
+            }
+          />
         ) : (
-          <ul className="space-y-3">
+          <ul className="space-y-4">
             {events.map((event) => {
               const counts = countsByEvent.get(event.id) ?? { yes: 0, pending: 0 };
+              const { day, month, time } = dateParts(event.event_date);
               return (
                 <li key={event.id}>
-                  <Link
-                    href={`/events/${event.id}`}
-                    className="block rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition hover:border-gray-300"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="font-medium">{event.title}</p>
-                        <p className="text-sm text-gray-500">
-                          {formatDate(event.event_date)}
-                        </p>
+                  <Link href={`/events/${event.id}`} className="block">
+                    <TicketCard
+                      notchTop={72}
+                      className="p-4 transition hover:-translate-y-0.5 hover:shadow-lg sm:p-5"
+                    >
+                      <div className="flex items-start gap-4">
+                        <div className="flex w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-plum/[0.06] py-2 text-plum">
+                          <span className="font-mono text-xl font-semibold leading-none">{day}</span>
+                          <span className="mt-1 font-mono text-[10px] uppercase leading-none tracking-wide">
+                            {month}
+                          </span>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="truncate font-display text-base text-ink">
+                              {event.title}
+                            </p>
+                            <StatusBadge
+                              label={STATUS_LABEL[event.status] ?? event.status}
+                              tone={eventStatusTone(event.status)}
+                            />
+                          </div>
+                          <p className="mt-1 truncate text-xs text-ink-muted">
+                            {time}
+                            {event.location ? ` · ${event.location}` : ""}
+                          </p>
+                        </div>
                       </div>
-                      <span className="whitespace-nowrap rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">
-                        {STATUS_LABEL[event.status] ?? event.status}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-sm text-gray-600">
-                      {counts.yes} confirmado(s) · {counts.pending} pendente(s) · limite{" "}
-                      {event.max_people}
-                    </p>
+
+                      <TicketDivider className="my-4" />
+
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[11px]">
+                        <span className="text-mint">{counts.yes} confirmados</span>
+                        <span className="text-amber">{counts.pending} pendentes</span>
+                        <span className="text-ink-muted">limite {event.max_people}</span>
+                      </div>
+                    </TicketCard>
                   </Link>
                 </li>
               );

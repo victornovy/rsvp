@@ -1,10 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { cn } from "@/lib/cn";
+import { Button } from "@/components/ui/Button";
+import { TicketCard, TicketDivider } from "@/components/ui/TicketCard";
+import { PlusIcon, TicketIcon, XIcon } from "@/components/icons";
 
 interface RsvpFormProps {
   publicToken: string;
   spotsRemaining: number;
+  antiPenetra: boolean;
 }
 
 interface Companion {
@@ -21,14 +26,23 @@ function storageKey(publicToken: string) {
   return `rsvp:${publicToken}`;
 }
 
-export function RsvpForm({ publicToken, spotsRemaining }: RsvpFormProps) {
+const responseCopy: Record<StoredRsvp["response"], { label: string; tone: string }> = {
+  yes: { label: "Presença confirmada", tone: "border-mint text-mint" },
+  no: { label: "Você não vai comparecer", tone: "border-clay text-clay" },
+  pending: { label: "Resposta pendente", tone: "border-amber text-amber" },
+};
+
+const inputClass =
+  "mt-1.5 w-full rounded-2xl border border-line bg-card px-4 py-2.5 text-sm text-ink placeholder:text-ink-faint focus:border-guava";
+const fieldLabel = "block text-xs font-semibold uppercase tracking-wide text-ink-muted";
+
+export function RsvpForm({ publicToken, spotsRemaining, antiPenetra }: RsvpFormProps) {
   const [stored, setStored] = useState<StoredRsvp | null>(null);
   const [name, setName] = useState("");
   const [contact, setContact] = useState("");
   const [companions, setCompanions] = useState<Companion[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
 
   useEffect(() => {
     const raw = window.localStorage.getItem(storageKey(publicToken));
@@ -86,7 +100,6 @@ export function RsvpForm({ publicToken, spotsRemaining }: RsvpFormProps) {
       };
       window.localStorage.setItem(storageKey(publicToken), JSON.stringify(record));
       setStored(record);
-      setSuccess(true);
     } catch {
       setError("Erro de conexão. Tente novamente.");
     } finally {
@@ -124,118 +137,140 @@ export function RsvpForm({ publicToken, spotsRemaining }: RsvpFormProps) {
   }
 
   if (stored) {
+    const copy = responseCopy[stored.response];
     return (
-      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <p className="text-sm text-gray-500">Sua confirmação, {stored.name}:</p>
-        <p className="mt-1 text-lg font-semibold">
-          {stored.response === "yes" && "Presença confirmada ✅"}
-          {stored.response === "no" && "Você marcou que não vai comparecer"}
-          {stored.response === "pending" && "Resposta pendente"}
+      <TicketCard notchTop={60} className="animate-fade-up p-7 text-center">
+        <p className="font-mono text-[11px] uppercase tracking-widest text-ink-faint">
+          Olá, {stored.name}
         </p>
-        {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
-        <div className="mt-4 flex gap-3">
-          <button
+        <div
+          className={cn(
+            "animate-stamp mx-auto mt-4 w-fit -rotate-3 rounded-xl border-[3px] px-5 py-2.5 font-display text-lg",
+            copy.tone,
+          )}
+        >
+          {copy.label}
+        </div>
+
+        {antiPenetra && stored.response === "yes" && (
+          <a
+            href={`/e/${publicToken}/credencial/${stored.guestToken}`}
+            className="mt-5 inline-flex items-center justify-center gap-2 rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-ink/90"
+          >
+            <TicketIcon width={16} height={16} />
+            Ver minha credencial
+          </a>
+        )}
+
+        <TicketDivider className="my-6" />
+
+        <p className="text-sm text-ink-muted">Mudou de ideia? Atualize sua resposta:</p>
+        {error && <p className="mt-3 text-sm text-clay">{error}</p>}
+        <div className="mt-4 flex justify-center gap-3">
+          <Button
             type="button"
+            variant={stored.response === "yes" ? "secondary" : "primary"}
             disabled={submitting || stored.response === "yes"}
             onClick={() => updateResponse("yes")}
-            className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
           >
-            Confirmar presença
-          </button>
-          <button
+            Vou comparecer
+          </Button>
+          <Button
             type="button"
+            variant="secondary"
             disabled={submitting || stored.response === "no"}
             onClick={() => updateResponse("no")}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 disabled:opacity-40"
           >
-            Não vou comparecer
-          </button>
+            Não vou
+          </Button>
         </div>
-      </div>
+      </TicketCard>
     );
   }
 
-  if (success) {
-    return null;
-  }
+  const pillTone =
+    spotsRemaining === 0 ? "text-clay bg-clay-light" : spotsRemaining <= 5 ? "text-amber bg-amber-light" : "text-mint bg-mint-light";
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm"
-    >
-      <h2 className="text-lg font-semibold">Confirme sua presença</h2>
-      <p className="mt-1 text-sm text-gray-500">
-        {spotsRemaining > 0
-          ? `${spotsRemaining} vaga(s) restante(s).`
-          : "Este evento pode estar com lotação esgotada."}
-      </p>
+    <TicketCard notchTop={130} className="p-6 sm:p-7">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="font-display text-lg text-ink">Confirme sua presença</h2>
+        <span className={cn("shrink-0 rounded-full px-2.5 py-1 font-mono text-[10px] font-medium uppercase tracking-wide", pillTone)}>
+          {spotsRemaining === 0 ? "lotado" : `${spotsRemaining} vaga(s)`}
+        </span>
+      </div>
 
-      <div className="mt-4 space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Nome</label>
-          <input
-            required
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-          />
+      <form onSubmit={handleSubmit} className="mt-5">
+        <div className="space-y-4">
+          <div>
+            <label className={fieldLabel}>Nome</label>
+            <input
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className={inputClass}
+              placeholder="Seu nome completo"
+            />
+          </div>
+          <div>
+            <label className={fieldLabel}>Contato (telefone ou e-mail)</label>
+            <input
+              value={contact}
+              onChange={(e) => setContact(e.target.value)}
+              className={inputClass}
+              placeholder="Opcional"
+            />
+          </div>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Contato (telefone ou e-mail)
-          </label>
-          <input
-            value={contact}
-            onChange={(e) => setContact(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-          />
-        </div>
+
+        <TicketDivider className="my-5" />
 
         <div>
           <div className="flex items-center justify-between">
-            <label className="block text-sm font-medium text-gray-700">
-              Acompanhantes
-            </label>
+            <label className={fieldLabel}>Acompanhantes</label>
             <button
               type="button"
               onClick={addCompanion}
-              className="text-sm font-medium text-gray-900 underline"
+              className="flex items-center gap-1 text-xs font-semibold text-guava"
             >
-              + adicionar
+              <PlusIcon width={13} height={13} />
+              Adicionar
             </button>
           </div>
-          <div className="mt-2 space-y-2">
-            {companions.map((companion, index) => (
-              <div key={index} className="flex gap-2">
-                <input
-                  value={companion.name}
-                  onChange={(e) => updateCompanion(index, e.target.value)}
-                  placeholder="Nome do acompanhante"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                />
-                <button
-                  type="button"
-                  onClick={() => removeCompanion(index)}
-                  className="rounded-lg border border-gray-300 px-3 text-sm text-gray-500"
-                >
-                  remover
-                </button>
-              </div>
-            ))}
-          </div>
+          {companions.length > 0 && (
+            <div className="mt-2.5 space-y-2">
+              {companions.map((companion, index) => (
+                <div key={index} className="flex gap-2">
+                  <input
+                    value={companion.name}
+                    onChange={(e) => updateCompanion(index, e.target.value)}
+                    placeholder="Nome do acompanhante"
+                    className={cn(inputClass, "mt-0")}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeCompanion(index)}
+                    className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-2xl border border-line text-ink-faint transition hover:border-clay/40 hover:text-clay"
+                    aria-label="Remover acompanhante"
+                  >
+                    <XIcon width={15} height={15} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      </div>
 
-      {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+        {error && (
+          <p className="mt-5 rounded-xl border border-clay/30 bg-clay-light px-3.5 py-2 text-sm text-clay">
+            {error}
+          </p>
+        )}
 
-      <button
-        type="submit"
-        disabled={submitting}
-        className="mt-6 w-full rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-60"
-      >
-        {submitting ? "Enviando..." : "Confirmar presença"}
-      </button>
-    </form>
+        <Button type="submit" disabled={submitting} className="mt-6 w-full">
+          {submitting ? "Enviando…" : "Confirmar presença"}
+        </Button>
+      </form>
+    </TicketCard>
   );
 }
