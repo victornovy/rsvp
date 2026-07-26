@@ -13,9 +13,12 @@ SaaS de confirmação de presença para eventos. Fases entregues:
   múltiplos links de validador simultâneos (um por portão, por exemplo) e
   toasts de feedback nas ações (ver
   [Painel do organizador](#painel-do-organizador-fase-3) abaixo).
+- **Fase 4 — monetização:** plano free (até 25 pessoas, anti-penetra
+  incluso, com anúncios) e add-ons pagos por evento via Mercado Pago
+  (mais convidados, remover anúncios, domínio próprio) — ver
+  [Monetização](#monetização-fase-4) abaixo.
 
-Pagamento e anúncios ficam para fases futuras (a coluna `is_paid` já existe
-no schema, sem UI ainda).
+WhatsApp (lembretes, confirmação por mensagem) fica para a Fase 5.
 
 ## Arquitetura
 
@@ -50,11 +53,15 @@ supabase db push
 ```
 
 Isso aplica `/supabase/migrations/*.sql`, criando as tabelas `events`,
-`guests`, `credentials`, `access_links`, as policies de RLS, o trigger de
-`updated_at`, o bucket de Storage `event-images` (público, com policies de
-escrita restritas ao dono) e a função `checkin_credential` — a RPC atômica
-que faz o check-in na porta (`security definer`, `EXECUTE` restrito à
-`service_role`; ver [Fluxo anti-penetra](#fluxo-anti-penetra-fase-2)).
+`guests`, `credentials`, `access_links`, `event_addons`, `payments`, as
+policies de RLS, o trigger de `updated_at`, o bucket de Storage
+`event-images` (público, com policies de escrita restritas ao dono) e a
+função `checkin_credential` — a RPC atômica que faz o check-in na porta
+(`security definer`, `EXECUTE` restrito à `service_role`; ver
+[Fluxo anti-penetra](#fluxo-anti-penetra-fase-2)). `event_addons` e
+`payments` só têm policy de `select` para o dono — escrita é exclusiva da
+`service_role`, sempre a partir do webhook do Mercado Pago já validado no
+servidor (ver [Monetização](#monetização-fase-4)).
 
 Para desenvolver localmente com Postgres em Docker em vez do projeto remoto:
 
@@ -105,6 +112,9 @@ cp apps/marketing/.env.example apps/marketing/.env.local
 | `SUPABASE_SERVICE_ROLE_KEY` | Chave service role — **usada só em Route Handlers**, nunca no client (necessária para o fluxo público de RSVP, que não passa por RLS) |
 | `NEXT_PUBLIC_APP_URL` | URL do app do produto (ex: `http://localhost:3000`) |
 | `NEXT_PUBLIC_MARKETING_URL` | URL da landing (ex: `http://localhost:3001`) |
+| `MERCADOPAGO_ACCESS_TOKEN` | Token de acesso do Mercado Pago — **usado só no servidor** (cria preferências de checkout e consulta pagamentos) |
+| `MERCADOPAGO_WEBHOOK_SECRET` | Chave secreta do webhook — opcional, mas recomendada (valida a assinatura `x-signature` antes de sequer consultar a API) |
+| `NEXT_PUBLIC_ADSENSE_CLIENT` | ID de cliente do AdSense (`ca-pub-...`) — deixe em branco para não exibir anúncios (ex: em dev) |
 
 ## 5. Rodar localmente
 
@@ -130,6 +140,26 @@ repositório:
 4. Configure as variáveis de ambiente do passo 4 em cada site.
 5. Atualize as Redirect URLs no Supabase Auth com o domínio final de
    produção do app.
+
+## 7. Configurar Mercado Pago e AdSense
+
+1. Crie uma aplicação em https://www.mercadopago.com.br/developers/panel —
+   use as **credenciais de teste** enquanto desenvolve.
+2. Copie o **Access Token** para `MERCADOPAGO_ACCESS_TOKEN`.
+3. Em **Webhooks**, configure a **Chave secreta** e copie para
+   `MERCADOPAGO_WEBHOOK_SECRET` (opcional, mas ativa a validação de
+   assinatura do webhook — ver [Monetização](#monetização-fase-4)).
+4. **A notification_url é enviada por preferência, não precisa cadastrar
+   no dashboard** — o app manda `${NEXT_PUBLIC_APP_URL}/api/webhooks/mercadopago`
+   em cada checkout criado. Isso significa que **localhost não recebe
+   webhook** (o MP não alcança sua máquina) — para testar o fluxo completo
+   localmente, exponha a porta com um túnel (`ngrok http 3000` ou similar)
+   e aponte `NEXT_PUBLIC_APP_URL` para a URL pública temporária enquanto
+   testa pagamento.
+5. Para anúncios, crie um site no [Google AdSense](https://adsense.google.com/)
+   e copie o ID de cliente (`ca-pub-...`) para `NEXT_PUBLIC_ADSENSE_CLIENT`.
+   Sem essa variável, o `<AdSlot />` simplesmente não renderiza nada — útil
+   para não precisar de conta de AdSense em dev.
 
 ## Fluxo anti-penetra (Fase 2)
 
@@ -231,6 +261,78 @@ Client Component chama `useToast().success/error/info(mensagem)`. Usado em:
 salvar/editar evento, cancelar evento, gerar/revogar link de validação,
 revogar/reemitir credencial, exportar CSV.
 
+## Monetização (Fase 4)
+
+**Princípio que não é negociável: o anti-penetra é grátis.** O plano free
+cobre até 25 pessoas por evento, QR + validação na porta inclusos, e exibe
+anúncios na página pública. O que é pago são **add-ons por evento** — não
+existe assinatura nem plano "premium" que desbloqueie o anti-penetra.
+
+**1. Catálogo.** `apps/app/src/lib/pricing.ts` define os três add-ons:
+`scale` (mais convidados, em tiers de 50/100/200/500 pessoas),
+`remove_ads` e `custom_domain` (preço fixo cada). Preços em centavos, só
+pra não lidar com ponto flutuante em dinheiro.
+
+**2. Checkout —** `POST /api/checkout/:eventId`. Autenticado, dono do
+evento (checado via RLS antes de criar qualquer coisa). Cria uma
+*preference* no Mercado Pago (SDK oficial `mercadopago`) com
+`external_reference = "{event_id}:{addon}"` e, para o addon `scale`, o
+`people_limit` escolhido vai no campo `metadata` da preferência (não dá
+pra colocar no `external_reference`, que tem formato fixo). Grava uma
+linha `payments` com `status='pending'` — isso é só auditoria de que um
+checkout foi iniciado; **a liberação de verdade não depende dessa linha**.
+Devolve o `init_point` (URL do Checkout Pro), pro qual o navegador do
+organizador é redirecionado inteiro (`window.location.href`, não popup).
+
+**3. Webhook —** `POST /api/webhooks/mercadopago`. Este é o único lugar
+onde um add-on é ativado. Nunca confia no corpo da notificação:
+   - Se `MERCADOPAGO_WEBHOOK_SECRET` está configurado, valida a assinatura
+     `x-signature` com o `WebhookSignatureValidator` do próprio SDK antes
+     de qualquer outra coisa (401 se inválida).
+   - **Sempre**, com ou sem essa validação, busca o pagamento de novo na
+     API do Mercado Pago (`GET /v1/payments/:id`, autenticado com
+     `MERCADOPAGO_ACCESS_TOKEN`) e usa só essa resposta — status, valor e
+     `external_reference` do payload da notificação são ignorados. Um
+     invasor que forje uma notificação não consegue ativar nada, porque a
+     ativação depende do que o MP realmente tem registrado para aquele
+     `payment_id`.
+   - **Idempotência:** `payments.provider_payment_id` é `unique`. Se o
+     mesmo `payment_id` chegar de novo com o mesmo status, a rota não faz
+     nada. Se chegar com status diferente (ex: `pending` → `approved`),
+     atualiza e ativa o add-on só nessa transição.
+   - Aprovado → cria (ou reativa) a linha `event_addons` correspondente e
+     aplica o efeito: `scale` aumenta `events.max_people` (nunca diminui —
+     usa `greatest`) e seta `is_paid=true`; os outros dois só setam
+     `is_paid=true` e ficam de flag pra `hasActiveAddon` checar depois.
+
+**4. Enforcement do teto —** `lib/addons.ts` →
+`getEffectiveMaxPeople(supabase, eventId, baseMaxPeople)`. Usado tanto no
+`confirm` quanto no `response` do RSVP: o teto efetivo é o maior valor
+entre `events.max_people` e o `people_limit` de um add-on `scale` ativo —
+redundante com o webhook já ter atualizado `max_people` diretamente, mas é
+a fonte de verdade explícita que a Fase 4 pede, e cobre qualquer cenário
+em que as duas colunas fiquem dessincronizadas.
+
+**5. Anúncios —** `<AdSlot />` (`apps/app/src/components/AdSlot.tsx`) só
+renderiza quando `NEXT_PUBLIC_ADSENSE_CLIENT` existe **e** o evento não
+tem `remove_ads` ativo (`hasActiveAddon`). Só é usado em
+`/e/:public_token` — nunca no painel do organizador, nunca em
+`/v/:linkToken`. O script do AdSense carrega assíncrono
+(`next/script strategy="afterInteractive"`) depois da página interativa,
+então não atrasa a confirmação de presença.
+
+**6. Painel — "Plano do evento"** (`PlanPanel.tsx`, em `/events/:id`).
+Mostra o teto atual, se anúncios estão ativos, se tem domínio próprio, e
+botões de upgrade por tier/add-on que disparam o checkout. Ao voltar do
+Mercado Pago (`back_urls` apontam pro próprio `/events/:id`), lê o
+`?status=` que o MP anexa na URL de retorno pra mostrar um toast — como a
+liberação de verdade só acontece quando o webhook chega (pode ser alguns
+segundos depois do redirect), o retorno também dispara um refetch do
+billing após um pequeno delay.
+`GET /api/events/:id/billing` devolve add-ons ativos e o histórico de
+`payments` pro dono do evento (via RLS, sem precisar de service role pra
+leitura).
+
 ## Funcionalidades entregues
 
 - Organizador autentica com Google, cria/edita/cancela eventos, faz upload de
@@ -249,9 +351,15 @@ revogar/reemitir credencial, exportar CSV.
   em CSV, aviso ao reduzir a lotação abaixo do já confirmado, múltiplos
   links de validador simultâneos com rótulo, e toasts de sucesso/erro nas
   ações.
+- Monetização: plano free (25 pessoas, anti-penetra grátis, com anúncios) e
+  add-ons pagos via Mercado Pago (mais convidados, remover anúncios,
+  domínio próprio), checkout + webhook idempotente, enforcement do teto,
+  AdSense condicional, e seção de plano/upgrade no painel.
 
-Fora de escopo por enquanto (schema já preparado): pagamento (`is_paid`) e
-anúncios.
+Fora de escopo por enquanto: WhatsApp (Fase 5) e o roteamento de fato de um
+domínio próprio (o add-on `custom_domain` já é vendável e fica registrado
+como ativo, mas a configuração de DNS/certificado não está implementada
+nesta fase).
 
 ## Limitações conhecidas
 
@@ -263,3 +371,11 @@ anúncios.
 - Revogar/reemitir uma credencial não notifica o convidado — a página de
   credencial dele simplesmente passa a mostrar o novo estado na próxima
   visita.
+- O retorno do checkout (`/events/:id?status=approved`) não garante que o
+  webhook já processou — o painel faz um único refetch após ~2,5s, sem
+  polling contínuo. Em pagamentos aprovados na hora (cartão) isso quase
+  sempre já é suficiente; em métodos mais lentos (boleto, pix pendente) o
+  organizador pode precisar recarregar a página depois.
+- `custom_domain` é vendável e fica registrado como add-on ativo, mas não
+  existe roteamento de domínio de fato nesta fase — é só o registro da
+  compra, preparado para a implementação de DNS/certificado vir depois.

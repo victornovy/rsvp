@@ -103,6 +103,41 @@ export type Database = {
           },
         ]
       }
+      event_addons: {
+        Row: {
+          addon: string
+          created_at: string
+          event_id: string
+          id: string
+          people_limit: number | null
+          status: string
+        }
+        Insert: {
+          addon: string
+          created_at?: string
+          event_id: string
+          id?: string
+          people_limit?: number | null
+          status?: string
+        }
+        Update: {
+          addon?: string
+          created_at?: string
+          event_id?: string
+          id?: string
+          people_limit?: number | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_addons_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       events: {
         Row: {
           anti_penetra: boolean
@@ -201,6 +236,47 @@ export type Database = {
             columns: ["main_guest_id"]
             isOneToOne: false
             referencedRelation: "guests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payments: {
+        Row: {
+          addon: string
+          amount_cents: number
+          created_at: string
+          event_id: string
+          id: string
+          provider: string
+          provider_payment_id: string | null
+          status: string
+        }
+        Insert: {
+          addon: string
+          amount_cents: number
+          created_at?: string
+          event_id: string
+          id?: string
+          provider?: string
+          provider_payment_id?: string | null
+          status?: string
+        }
+        Update: {
+          addon?: string
+          amount_cents?: number
+          created_at?: string
+          event_id?: string
+          id?: string
+          provider?: string
+          provider_payment_id?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
             referencedColumns: ["id"]
           },
         ]

@@ -2,6 +2,7 @@ import { createSupabaseServiceClient } from "@rsvp/db";
 import { apiError, apiOk } from "@/lib/api-response";
 import { rsvpResponseSchema } from "@/lib/validation";
 import { ensureCredential } from "@/lib/credentials";
+import { getEffectiveMaxPeople } from "@/lib/addons";
 
 export async function PATCH(
   request: Request,
@@ -62,7 +63,9 @@ export async function PATCH(
       return apiError("INTERNAL_ERROR", countError.message, 500);
     }
 
-    if ((confirmedCount ?? 0) + 1 > event.max_people) {
+    const effectiveMaxPeople = await getEffectiveMaxPeople(supabase, event.id, event.max_people);
+
+    if ((confirmedCount ?? 0) + 1 > effectiveMaxPeople) {
       return apiError(
         "LIMIT_REACHED",
         "Lotação máxima do evento atingida.",

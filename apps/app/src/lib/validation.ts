@@ -39,3 +39,8 @@ export const validatorLinkCreateSchema = z.object({
 export const checkinSchema = z.object({
   qr_token: z.string().trim().min(1, "QR inválido").max(64),
 });
+
+export const checkoutCreateSchema = z.object({
+  addon: z.enum(["scale", "remove_ads", "custom_domain"]),
+  people_limit: z.coerce.number().int().positive().optional(),
+});

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
@@ -13,6 +14,7 @@ import { ValidatorLinkPanel, type ValidatorLink } from "@/components/ValidatorLi
 import { LiveCheckinStats } from "@/components/LiveCheckinStats";
 import { EventSummaryCards } from "@/components/EventSummaryCards";
 import { ExportCsvButton } from "@/components/ExportCsvButton";
+import { PlanPanel } from "@/components/PlanPanel";
 
 const STATUS_LABEL: Record<string, string> = {
   active: "Ativo",
@@ -155,6 +157,19 @@ export default async function EventDetailPage({
             checkedIn={checkedInCount}
             antiPenetra={event.anti_penetra}
           />
+        </section>
+
+        <section className="mt-8">
+          <h2 className="mb-3 font-display text-lg text-ink">Plano do evento</h2>
+          <Suspense
+            fallback={
+              <div className="rounded-card border border-line bg-card p-5 text-sm text-ink-muted">
+                Carregando plano…
+              </div>
+            }
+          >
+            <PlanPanel eventId={event.id} />
+          </Suspense>
         </section>
 
         {event.anti_penetra && (

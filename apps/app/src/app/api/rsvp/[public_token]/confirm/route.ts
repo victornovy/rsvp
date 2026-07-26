@@ -2,6 +2,7 @@ import { createSupabaseServiceClient, generateToken } from "@rsvp/db";
 import { apiError, apiOk } from "@/lib/api-response";
 import { rsvpConfirmSchema } from "@/lib/validation";
 import { ensureCredential } from "@/lib/credentials";
+import { getEffectiveMaxPeople } from "@/lib/addons";
 
 export async function POST(
   request: Request,
@@ -47,8 +48,9 @@ export async function POST(
   }
 
   const partySize = 1 + parsed.data.companions.length;
+  const effectiveMaxPeople = await getEffectiveMaxPeople(supabase, event.id, event.max_people);
 
-  if ((confirmedCount ?? 0) + partySize > event.max_people) {
+  if ((confirmedCount ?? 0) + partySize > effectiveMaxPeople) {
     return apiError(
       "LIMIT_REACHED",
       "Lotação máxima do evento atingida. Não há vagas suficientes para o grupo informado.",

@@ -10,3 +10,6 @@ export type GuestUpdate = Database["public"]["Tables"]["guests"]["Update"];
 
 export type Credential = Database["public"]["Tables"]["credentials"]["Row"];
 export type AccessLink = Database["public"]["Tables"]["access_links"]["Row"];
+
+export type EventAddon = Database["public"]["Tables"]["event_addons"]["Row"];
+export type Payment = Database["public"]["Tables"]["payments"]["Row"];

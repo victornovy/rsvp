@@ -3,6 +3,8 @@ import { createSupabaseServiceClient } from "@rsvp/db";
 import { RsvpForm } from "@/components/RsvpForm";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { CalendarIcon, PinIcon } from "@/components/icons";
+import { AdSlot } from "@/components/AdSlot";
+import { hasActiveAddon } from "@/lib/addons";
 
 function formatDate(iso: string) {
   return new Intl.DateTimeFormat("pt-BR", {
@@ -38,6 +40,7 @@ export default async function PublicEventPage({
 
   const spotsRemaining = Math.max(event.max_people - (confirmedCount ?? 0), 0);
   const marketingUrl = process.env.NEXT_PUBLIC_MARKETING_URL ?? "#";
+  const adsRemoved = await hasActiveAddon(supabase, event.id, "remove_ads");
 
   return (
     <main className="min-h-screen bg-paper">
@@ -102,6 +105,8 @@ export default async function PublicEventPage({
               />
             )}
           </div>
+
+          <AdSlot hideAds={adsRemoved} />
 
           <p className="mt-10 text-center text-xs text-ink-faint">
             Convite criado com{" "}
