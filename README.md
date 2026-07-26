@@ -17,15 +17,22 @@ SaaS de confirmação de presença para eventos. Fases entregues:
   incluso, com anúncios) e add-ons pagos por evento via Mercado Pago
   (mais convidados, remover anúncios, domínio próprio) — ver
   [Monetização](#monetização-fase-4) abaixo.
+- **Fase 5 — aquisição:** site de marketing completo e indexável (landing,
+  preços, blog, SEO técnico, analytics sem cookies) e o add-on de convite
+  por WhatsApp — ver [Site de marketing](#site-de-marketing-fase-5) e
+  [Add-on WhatsApp](#add-on-whatsapp-fase-5) abaixo.
 
-WhatsApp (lembretes, confirmação por mensagem) fica para a Fase 5.
+Envio automático em massa por WhatsApp (via WhatsApp Business API) fica
+para uma fase futura — nesta fase é `wa.me` (o organizador/convidado ainda
+dispara a mensagem manualmente, só que já pronta).
 
 ## Arquitetura
 
 ```
 /apps/app         → app.seudominio.com  (produto, noindex)
-/apps/marketing   → seudominio.com       (landing, indexável — stub nesta fase)
+/apps/marketing   → seudominio.com       (landing, blog e páginas institucionais — indexável)
 /packages/db      → client Supabase (browser/server/service) + tipos gerados
+/packages/pricing → catálogo de preços dos add-ons, compartilhado entre app e marketing
 /supabase/migrations → schema SQL, RLS, triggers, storage bucket
 ```
 
@@ -61,7 +68,9 @@ função `checkin_credential` — a RPC atômica que faz o check-in na porta
 [Fluxo anti-penetra](#fluxo-anti-penetra-fase-2)). `event_addons` e
 `payments` só têm policy de `select` para o dono — escrita é exclusiva da
 `service_role`, sempre a partir do webhook do Mercado Pago já validado no
-servidor (ver [Monetização](#monetização-fase-4)).
+servidor (ver [Monetização](#monetização-fase-4)). A migração mais recente
+adiciona o add-on `whatsapp` e a coluna `events.whatsapp_message_template`
+(ver [Add-on WhatsApp](#add-on-whatsapp-fase-5)).
 
 Para desenvolver localmente com Postgres em Docker em vez do projeto remoto:
 
@@ -115,6 +124,7 @@ cp apps/marketing/.env.example apps/marketing/.env.local
 | `MERCADOPAGO_ACCESS_TOKEN` | Token de acesso do Mercado Pago — **usado só no servidor** (cria preferências de checkout e consulta pagamentos) |
 | `MERCADOPAGO_WEBHOOK_SECRET` | Chave secreta do webhook — opcional, mas recomendada (valida a assinatura `x-signature` antes de sequer consultar a API) |
 | `NEXT_PUBLIC_ADSENSE_CLIENT` | ID de cliente do AdSense (`ca-pub-...`) — deixe em branco para não exibir anúncios (ex: em dev) |
+| `NEXT_PUBLIC_ANALYTICS_ID` | Domínio configurado no Plausible (ex: `seudominio.com`) — só usado em `apps/marketing`; em branco, nenhum script de analytics carrega |
 
 ## 5. Rodar localmente
 
@@ -333,6 +343,84 @@ billing após um pequeno delay.
 `payments` pro dono do evento (via RLS, sem precisar de service role pra
 leitura).
 
+## Site de marketing (Fase 5)
+
+`apps/marketing` é indexável de propósito — o oposto do `apps/app`. Roda em
+`http://localhost:3001` / `seudominio.com`.
+
+**Páginas.** `/` (landing focada no anti-penetra: proposta de valor, 3
+passos de "como funciona", casos de uso, FAQ), `/precos` (comparativo
+Free x add-ons, usando `@rsvp/pricing` — o mesmo catálogo que o checkout
+real usa, então a página nunca desalinha do preço cobrado), `/blog` e
+`/blog/:slug` (posts em markdown), `/sobre` e `/contato`.
+
+**Blog.** Cada post é um arquivo `.md` em `apps/marketing/content/blog/`
+com frontmatter (`title`, `description`, `date`) processado por
+`gray-matter` + `marked` (`apps/marketing/src/lib/blog.ts`) — sem MDX, sem
+build step extra, só filesystem + parse. Vem com 3 posts de exemplo. Pra
+adicionar um novo post, é só criar o `.md` — `generateStaticParams` no
+`/blog/:slug` e o `sitemap.ts` já pegam automaticamente.
+
+**SEO técnico.**
+- `apps/marketing/src/lib/seo.ts` → `buildMetadata()` gera canonical,
+  OpenGraph e Twitter card consistentes a partir de `{title, description,
+  path}` — usado em toda página, inclusive posts do blog (com
+  `type: "article"` e `publishedTime`).
+- Imagem OG **dinâmica e compartilhada**: `apps/marketing/src/app/api/og/route.tsx`
+  usa `next/og` (`ImageResponse`) pra gerar a imagem na hora, parametrizada
+  por `?title=`/`?eyebrow=` — evita ter um arquivo de imagem estático por
+  página ou por post.
+- `sitemap.ts` enumera as rotas estáticas + todos os posts do blog;
+  `robots.ts` libera tudo (`allow: "/"`) e aponta pro sitemap — o oposto
+  do `robots.ts` do `apps/app`.
+- JSON-LD: `Organization` no layout raiz (toda página), `FAQPage` na
+  landing, `Article` em cada post — via um componente `<JsonLd />` simples
+  (`<script type="application/ld+json">`).
+- Canonicals sempre usam `NEXT_PUBLIC_MARKETING_URL`, nunca
+  `NEXT_PUBLIC_APP_URL` — os dois domínios nunca se confundem nos metadados.
+
+**Analytics sem cookies.** `apps/marketing/src/components/Analytics.tsx`
+só injeta o script (compatível com Plausible) quando
+`NEXT_PUBLIC_ANALYTICS_ID` está configurado — em branco, nenhum script de
+terceiro carrega, nem em dev. Os 4 CTAs "Criar evento grátis" (header,
+landing x2, `/precos`) passam por um `<CtaButton />` que dispara
+`trackEvent("cta_create_event", ...)` (ou `cta_pricing_free` na página de
+preços) antes de navegar pro app.
+
+## Add-on WhatsApp (Fase 5)
+
+Facilita reenviar o link (ou o QR individual, se o evento tem
+anti-penetra) de um convidado já confirmado por WhatsApp — sem API paga,
+sem envio automático em massa. `wa.me` só abre o WhatsApp com a mensagem
+pronta; quem dispara ainda é uma pessoa, num clique.
+
+- **Add-on pago por padrão**, seguindo o mesmo mecanismo da Fase 4
+  (`event_addons.addon = 'whatsapp'`, comprado via `PlanPanel` →
+  `POST /api/checkout/:eventId` → webhook ativa). Pra tratar como grátis
+  em vez de pago, é só remover o gate `hasActiveAddon(..., "whatsapp")` em
+  `apps/app/src/app/events/[id]/page.tsx` — não existe uma flag de
+  ambiente separada pra isso, de propósito, pra não duplicar o mecanismo
+  de add-ons com um sistema de feature flags paralelo.
+- **Template editável** por evento (`events.whatsapp_message_template`,
+  `PATCH /api/events/:id`). Placeholders `{evento}`, `{data}`, `{link}`
+  resolvidos em `apps/app/src/lib/whatsapp.ts`
+  (`renderWhatsAppTemplate`). Sem template salvo, usa
+  `DEFAULT_WHATSAPP_TEMPLATE`.
+- **Link individual quando dá.** Se o evento tem `anti_penetra` e o
+  convidado já confirmou (`response = 'yes'`), o `{link}` aponta pra
+  credencial dele (`/e/:public_token/credencial/:guestToken`) — o "link de
+  confirmação individual" de verdade. Caso contrário, cai no link público
+  geral do evento.
+- **Telefone best-effort.** `buildWhatsAppUrl` extrai só os dígitos de
+  `guests.contact`; se sobrar um número plausível (8+ dígitos), monta
+  `https://wa.me/<numero>?text=...`; senão, cai em `https://wa.me/?text=...`
+  (o WhatsApp abre do mesmo jeito, com a mensagem pronta — só sem
+  destinatário pré-selecionado).
+- **Em massa** = a lista de convidados com contato preenchido, cada um com
+  seu próprio botão "Abrir WhatsApp" já com o link certo — não existe um
+  disparo único que manda pra todo mundo de uma vez (isso exigiria a
+  WhatsApp Business API, fora do escopo desta fase).
+
 ## Funcionalidades entregues
 
 - Organizador autentica com Google, cria/edita/cancela eventos, faz upload de
@@ -353,13 +441,19 @@ leitura).
   ações.
 - Monetização: plano free (25 pessoas, anti-penetra grátis, com anúncios) e
   add-ons pagos via Mercado Pago (mais convidados, remover anúncios,
-  domínio próprio), checkout + webhook idempotente, enforcement do teto,
-  AdSense condicional, e seção de plano/upgrade no painel.
+  domínio próprio, convite por WhatsApp), checkout + webhook idempotente,
+  enforcement do teto, AdSense condicional, e seção de plano/upgrade no
+  painel.
+- Site de marketing indexável: landing, preços, blog em markdown com SEO
+  técnico completo (metadata, OG dinâmico, sitemap, robots, JSON-LD) e
+  analytics sem cookies.
+- Add-on de convite por WhatsApp: template editável, link individual (QR)
+  quando o evento tem anti-penetra, envio em massa manual via `wa.me`.
 
-Fora de escopo por enquanto: WhatsApp (Fase 5) e o roteamento de fato de um
-domínio próprio (o add-on `custom_domain` já é vendável e fica registrado
-como ativo, mas a configuração de DNS/certificado não está implementada
-nesta fase).
+Fora de escopo por enquanto: envio automático em massa por WhatsApp (exige
+WhatsApp Business API) e o roteamento de fato de um domínio próprio (o
+add-on `custom_domain` já é vendável e fica registrado como ativo, mas a
+configuração de DNS/certificado não está implementada nesta fase).
 
 ## Limitações conhecidas
 
@@ -379,3 +473,10 @@ nesta fase).
 - `custom_domain` é vendável e fica registrado como add-on ativo, mas não
   existe roteamento de domínio de fato nesta fase — é só o registro da
   compra, preparado para a implementação de DNS/certificado vir depois.
+- `guests.contact` é texto livre (pode ser e-mail, não só telefone) — o
+  botão de WhatsApp extrai dígitos e faz o melhor esforço; se não sobrar
+  um número plausível, o link abre o WhatsApp sem destinatário
+  pré-selecionado em vez de falhar silenciosamente.
+- Posts do blog são arquivos versionados no repositório — publicar um post
+  novo passa por um deploy, não existe um painel de CMS. Deliberado nesta
+  fase: mantém o conteúdo do blog no controle de versão, sem infra extra.

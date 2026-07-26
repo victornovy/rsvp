@@ -15,6 +15,8 @@ import { LiveCheckinStats } from "@/components/LiveCheckinStats";
 import { EventSummaryCards } from "@/components/EventSummaryCards";
 import { ExportCsvButton } from "@/components/ExportCsvButton";
 import { PlanPanel } from "@/components/PlanPanel";
+import { WhatsAppSection } from "@/components/WhatsAppSection";
+import { hasActiveAddon } from "@/lib/addons";
 
 const STATUS_LABEL: Record<string, string> = {
   active: "Ativo",
@@ -93,6 +95,8 @@ export default async function EventDetailPage({
     }));
     checkedInCount = usedCount ?? 0;
   }
+
+  const whatsappActive = await hasActiveAddon(supabase, event.id, "whatsapp");
 
   return (
     <>
@@ -192,6 +196,20 @@ export default async function EventDetailPage({
             <ExportCsvButton eventId={event.id} />
           </div>
           <GuestList eventId={event.id} antiPenetra={event.anti_penetra} />
+        </section>
+
+        <section className="mt-8">
+          <h2 className="mb-3 font-display text-lg text-ink">Convite por WhatsApp</h2>
+          <WhatsAppSection
+            eventId={event.id}
+            eventTitle={event.title}
+            eventDateIso={event.event_date}
+            publicToken={event.public_token}
+            appUrl={appUrl}
+            antiPenetra={event.anti_penetra}
+            initialTemplate={event.whatsapp_message_template}
+            active={whatsappActive}
+          />
         </section>
       </main>
     </>

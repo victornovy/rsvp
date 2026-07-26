@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { createSupabaseServiceClient } from "@rsvp/db";
 import { RsvpForm } from "@/components/RsvpForm";
@@ -5,6 +6,12 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { CalendarIcon, PinIcon } from "@/components/icons";
 import { AdSlot } from "@/components/AdSlot";
 import { hasActiveAddon } from "@/lib/addons";
+
+// Página pública, mas com token de acesso — nunca deve ser indexada, mesmo
+// já havendo noindex global no layout raiz (defesa em profundidade).
+export const metadata: Metadata = {
+  robots: { index: false, follow: false, nocache: true },
+};
 
 function formatDate(iso: string) {
   return new Intl.DateTimeFormat("pt-BR", {

@@ -8,6 +8,7 @@ export const eventCreateSchema = z.object({
   image_url: z.string().url().optional().nullable(),
   max_people: z.coerce.number().int().min(1).max(100000).default(25),
   anti_penetra: z.boolean().default(false),
+  whatsapp_message_template: z.string().trim().max(1000).optional().nullable(),
 });
 
 export const eventUpdateSchema = eventCreateSchema.partial();
@@ -41,6 +42,6 @@ export const checkinSchema = z.object({
 });
 
 export const checkoutCreateSchema = z.object({
-  addon: z.enum(["scale", "remove_ads", "custom_domain"]),
+  addon: z.enum(["scale", "remove_ads", "custom_domain", "whatsapp"]),
   people_limit: z.coerce.number().int().positive().optional(),
 });

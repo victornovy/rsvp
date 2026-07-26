@@ -60,6 +60,7 @@ export async function GET(
     isPaid: event.is_paid,
     adsRemoved: activeAddons.some((a) => a.addon === "remove_ads"),
     customDomain: activeAddons.some((a) => a.addon === "custom_domain"),
+    whatsappActive: activeAddons.some((a) => a.addon === "whatsapp"),
     addons: addons ?? [],
     payments: payments ?? [],
   });

@@ -14,6 +14,7 @@ interface Billing {
   isPaid: boolean;
   adsRemoved: boolean;
   customDomain: boolean;
+  whatsappActive: boolean;
   addons: EventAddon[];
   payments: Payment[];
 }
@@ -35,6 +36,7 @@ const ADDON_TITLE: Record<AddonId, string> = {
   scale: "Mais convidados",
   remove_ads: FLAT_ADDON_PRICES.remove_ads.label,
   custom_domain: FLAT_ADDON_PRICES.custom_domain.label,
+  whatsapp: FLAT_ADDON_PRICES.whatsapp.label,
 };
 
 export function PlanPanel({ eventId }: { eventId: string }) {
@@ -196,6 +198,16 @@ export function PlanPanel({ eventId }: { eventId: string }) {
               {billing.customDomain
                 ? "Domínio próprio ativo"
                 : `Domínio próprio · ${formatBRL(FLAT_ADDON_PRICES.custom_domain.amountCents)}`}
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => checkout("whatsapp")}
+              disabled={billing.whatsappActive || checkingOut !== null}
+            >
+              {billing.whatsappActive
+                ? "Convite por WhatsApp ativo"
+                : `Convite por WhatsApp · ${formatBRL(FLAT_ADDON_PRICES.whatsapp.amountCents)}`}
             </Button>
           </div>
         </div>

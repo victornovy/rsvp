@@ -6,7 +6,7 @@ import type { Database } from "@rsvp/db";
 import { fetchMercadoPagoPayment } from "@/lib/mercadopago";
 import type { AddonId } from "@/lib/pricing";
 
-const KNOWN_ADDONS: AddonId[] = ["scale", "remove_ads", "custom_domain"];
+const KNOWN_ADDONS: AddonId[] = ["scale", "remove_ads", "custom_domain", "whatsapp"];
 
 function mapPaymentStatus(mpStatus: string | undefined): "pending" | "approved" | "rejected" | "refunded" {
   if (mpStatus === "approved") return "approved";

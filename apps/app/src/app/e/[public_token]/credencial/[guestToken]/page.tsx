@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import QRCode from "qrcode";
 import { createSupabaseServiceClient } from "@rsvp/db";
@@ -5,6 +6,11 @@ import type { Guest } from "@rsvp/db";
 import { ensureCredential } from "@/lib/credentials";
 import { StatusBadge, credentialTone, CREDENTIAL_STATUS_LABEL } from "@/components/ui/StatusBadge";
 import { TicketCard } from "@/components/ui/TicketCard";
+
+// Contém o QR de entrada de alguém — nunca deve ser indexada.
+export const metadata: Metadata = {
+  robots: { index: false, follow: false, nocache: true },
+};
 
 async function loadParty(titular: Guest, allGuests: Guest[]) {
   return [titular, ...allGuests.filter((g) => g.main_guest_id === titular.id)];

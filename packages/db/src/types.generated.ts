@@ -154,6 +154,7 @@ export type Database = {
           status: string
           title: string
           updated_at: string
+          whatsapp_message_template: string | null
         }
         Insert: {
           anti_penetra?: boolean
@@ -170,6 +171,7 @@ export type Database = {
           status?: string
           title: string
           updated_at?: string
+          whatsapp_message_template?: string | null
         }
         Update: {
           anti_penetra?: boolean
@@ -186,6 +188,7 @@ export type Database = {
           status?: string
           title?: string
           updated_at?: string
+          whatsapp_message_template?: string | null
         }
         Relationships: []
       }

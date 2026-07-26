@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@rsvp/db": "workspace:*",
+    "@rsvp/pricing": "workspace:*",
     "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "^2.45.4",
     "html5-qrcode": "^2.3.8",

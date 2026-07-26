@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import dynamic from "next/dynamic";
 import { getValidatorLinkContext } from "@/lib/validator";
 
@@ -5,6 +6,11 @@ const ValidatorScanner = dynamic(
   () => import("@/components/ValidatorScanner").then((mod) => mod.ValidatorScanner),
   { ssr: false },
 );
+
+// Tela operacional da portaria — nunca deve ser indexada nem exibir anúncios.
+export const metadata: Metadata = {
+  robots: { index: false, follow: false, nocache: true },
+};
 
 const REASON_MESSAGE: Record<string, string> = {
   expired: "Este link de validação expirou.",
