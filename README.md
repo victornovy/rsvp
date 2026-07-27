@@ -480,3 +480,11 @@ configuração de DNS/certificado não está implementada nesta fase).
 - Posts do blog são arquivos versionados no repositório — publicar um post
   novo passa por um deploy, não existe um painel de CMS. Deliberado nesta
   fase: mantém o conteúdo do blog no controle de versão, sem infra extra.
+
+## Próximos passos
+
+Nada do que vem depois do MVP (Fases 0–5) deve ser iniciado sem antes
+rodar um evento-piloto real e olhar os dados — ver
+[`docs/BACKLOG.md`](docs/BACKLOG.md) para as frentes de evolução
+avaliadas (validação offline na porta, WhatsApp Business API, B2B/
+white-label, extras de RSVP, e mais) e a ordem de prioridade sugerida.
